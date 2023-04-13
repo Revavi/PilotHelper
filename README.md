@@ -33,3 +33,8 @@ _Работает только с помощью **moonloader**_.
 
 [**telegram**](https://t.me/SosuPercocet)  
 [**VK**](https://vk.com/revavi)
+
+## Список изменений
+
+**V 1.0.0 >**
+ - Релиз
