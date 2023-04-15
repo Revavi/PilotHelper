@@ -1,6 +1,6 @@
 script_name('PilotHelper')
 script_author('Revavi')
-script_version('1.0.1')
+script_version('1.0.2')
 
 require("moonloader")
 local encoding = require 'encoding'
@@ -29,7 +29,7 @@ local timerSt = false
 local timer = 0
 
 local aUCustP = mn.bool(true)
-local winPos = nil
+local winPos = {x = select(2, getScreenResolution()) / 2-100, y = 140}
 
 local f18 = nil
 local f25 = nil
@@ -77,6 +77,8 @@ local setts = inicfg.load({
 local function msg(arg) if arg ~= nil then return sampAddChatMessage('[PilotHelper] {FFFFFF}'..tostring(arg), 0x009900) end end
 
 function loadcfg()
+	winPos.x=setts.main.x
+	winPos.y=setts.main.y
 	aUCustP[0]=setts.main.aUCustP
 	statsSt[0]=setts.main.statsSt
 	cw[0]=setts.weather.cw
@@ -280,8 +282,19 @@ function sampev.onServerMessage(color, text)
 	inicfg.save(setts, directIni)
 end
 
+function sampGetListboxItemByText(text, plain)
+    if not sampIsDialogActive() then return -1 end
+        plain = not (plain == false)
+    for i = 0, sampGetListboxItemsCount() - 1 do
+        if sampGetListboxItemText(i):find(text, 1, plain) then
+            return i
+        end
+    end
+    return -1
+end
+
 function sampev.onShowDialog(id, style, title, button1, button2, text)
-	if text:find('Частный самолет') and aUCustP[0] then
+	if title:find('Выберите самолет') and aUCustP[0] then
 		lua_thread.create(function()
 			wait(0)
 			local listbox = sampGetListboxItemByText('Частный самолет')
