@@ -1,6 +1,7 @@
 script_name('PilotHelper')
 script_author('Revavi')
-script_version('1.0.2')
+script_version('1.0.3')
+script_version_number(4)
 
 require("moonloader")
 local encoding = require 'encoding'
@@ -14,32 +15,31 @@ local memory = require 'memory'
 encoding.default = 'CP1251'
 local u8 = encoding.UTF8
 
+local lfunc, fcmd = {}, {}
+
 local wDir = getWorkingDirectory()
 
-local mVec2 = imgui.ImVec2
-local mVec4 = imgui.ImVec4
-local mn = imgui.new
+local mVec2, mVec4, mn = imgui.ImVec2, imgui.ImVec4, imgui.new
+local zeroClr = mVec4(0,0,0,0)
 
-local statsSt = mn.bool(false)
-local mainSt = mn.bool(false)
-local cw = mn.int(0)
-local ct = mn.int(0)
+local statsSt, mainSt = mn.bool(false), mn.bool(false)
+local cw, ct = mn.int(0), mn.int(0)
 
-local timerSt = false
-local timer = 0
+local timerSt, timer = false, 0
 
 local aUCustP = mn.bool(true)
-local winPos = {x = select(2, getScreenResolution()) / 2-100, y = 140}
 
-local f18 = nil
-local f25 = nil
+local f18, f25 = nil, nil
+
+local day, hour, diff = true, 6, 0
 
 local stats = {
 	tidex = 0,
 	money = 0,
 	award = 0,
 	pilot = 0,
-	count = 0
+	countD = 0,
+	countN = 0
 }
 
 local dirs = {
@@ -66,7 +66,8 @@ local setts = inicfg.load({
 		money = 0,
 		award = 0,
 		pilot = 0,
-		count = 0
+		countD = 0,
+		countN = 0
 	},
 	timer = {
 		count = 0,
@@ -76,9 +77,7 @@ local setts = inicfg.load({
 
 local function msg(arg) if arg ~= nil then return sampAddChatMessage('[PilotHelper] {FFFFFF}'..tostring(arg), 0x009900) end end
 
-function loadcfg()
-	winPos.x=setts.main.x
-	winPos.y=setts.main.y
+function lfunc.loadcfg()
 	aUCustP[0]=setts.main.aUCustP
 	statsSt[0]=setts.main.statsSt
 	cw[0]=setts.weather.cw
@@ -87,7 +86,8 @@ function loadcfg()
 	stats.money=setts.stats.money
 	stats.award=setts.stats.award
 	stats.pilot=setts.stats.pilot
-	stats.count=setts.stats.count
+	stats.countD=setts.stats.countD
+	stats.countN=setts.stats.countN
 	timer=setts.timer.count
 	timerSt=setts.timer.state
 end
@@ -96,10 +96,10 @@ function main()
 	if not isSampLoaded() or not isSampfuncsLoaded() then return end
 	repeat wait(0) until isSampAvailable()
 	
-	loadcfg()
-	counter()
-	sampRegisterChatCommand('pilot', om)
-	sampRegisterChatCommand('ptimer', turnTimer)
+	lfunc.loadcfg()
+	lfunc.counter()
+	sampRegisterChatCommand('pilot', function() mainSt[0] = not mainSt[0] end)
+	sampRegisterChatCommand('ptimer', fcmd.turnTimer)
 	
 	msg('Скрипт запущен | Открыть меню: /pilot | Автор: '..thisScript().authors[1])
 	
@@ -107,60 +107,21 @@ function main()
 		wait(0)
 		forceWeatherNow(cw[0])
 		memory.write(0xB70153, ct[0], 1, false)
+		hour = tonumber(os.date('%H', os.time() + diff))
+		day = not (hour >= 21 or hour < 5)
 	end
 end
 
-function om()
-	mainSt[0] = not mainSt[0]
-end
-
-function turnTimer()
+function fcmd.turnTimer()
 	timerSt = not timerSt
 	setts.timer.state=timerSt
-	inicfg.save(setts, directIni)
 	msg(timerSt and 'Счётчик запущен' or 'Счётчик остановлен')
 end
 
-function resetStat()
-	stats = {
-		tidex = 0,
-		money = 0,
-		award = 0,
-		pilot = 0,
-		count = 0
-	}
+function lfunc.resetStat()
+	stats = { tidex = 0, money = 0, award = 0, pilot = 0, countD = 0, countN = 0 }
 	setts.stats=stats
-	inicfg.save(setts, directIni)
 	msg('Статистика сброшена')
-end
-
-function imgui.CenterText(text, arg)
-	local arg = arg or 0
-	imgui.SetCursorPosX(imgui.GetWindowWidth() / 2 - imgui.CalcTextSize(text).x / 2 )
-	if arg == 0 then imgui.Text(text) elseif arg == 1 then imgui.TextDisabled(text) end
-end
-
-function imgui.KolhozText(sign, text)
-	imgui.SetCursorPosX(16 - imgui.CalcTextSize(sign).x / 2 )
-	imgui.Text(sign)
-	imgui.SameLine()
-	imgui.SetCursorPosX(30)
-	imgui.Text(text)
-end
-
-function imgui.Hint(str_id, hint)
-	imgui.SameLine()
-	imgui.TextDisabled(fa('CIRCLE_QUESTION'))
-	if imgui.IsItemHovered() then
-		imgui.PushStyleVarVec2(imgui.StyleVar.WindowPadding, mVec2(10, 10))
-		imgui.BeginTooltip()
-		imgui.PushTextWrapPos(450)
-		imgui.TextColored(imgui.GetStyle().Colors[imgui.Col.ButtonHovered], fa('CIRCLE_INFO')..u8' Подсказка:')
-		imgui.TextUnformatted(hint)
-		imgui.PopTextWrapPos()
-		imgui.EndTooltip()
-		imgui.PopStyleVar()
-	end
 end
 
 local mainWin = imgui.OnFrame(function() return mainSt[0] and not isGamePaused() end,
@@ -177,130 +138,133 @@ function(self)
 		imgui.CenterText('by '..thisScript().authors[1], 1)
 		imgui.Separator()
 		
-		imgui.CenterText(u8'Список команд'); imgui.Hint('1', u8'/pilot - открыть/закрыть меню\n/ptimer - включить/выключить счётчик')
+		imgui.CenterText(fa('CIRCLE_QUESTION'), 1); imgui.Hint('hint', u8'СПИСОК КОМАНД:\n\n/pilot - открыть/закрыть меню\n/ptimer - включить/выключить счётчик\n\nРЕГУЛИРОВКА ВРЕМЕНИ:\nЧтобы скрипт корректно понимал, день сейчас или ночь, нужно перед началом смены звонить службу точного времени.')
 		if imgui.Button(statsSt[0] and u8'Скрыть статистику' or u8'Показать статистику', mVec2(148, 24)) then statsSt[0] = not statsSt[0]; setts.main.statsSt = statsSt[0] end
 		imgui.SameLine()
-		if imgui.Button(u8'Сбросить статистику', mVec2(148, 24)) then resetStat() end
+		if imgui.Button(u8'Сбросить статистику', mVec2(148, 24)) then lfunc.resetStat() end
 		
-		if imgui.Button(timerSt and u8'Выключить счётчик' or u8'Включить счётчик', mVec2(148, 24)) then turnTimer() end
+		if imgui.Button(timerSt and u8'Выключить счётчик' or u8'Включить счётчик', mVec2(148, 24)) then fcmd.turnTimer() end
 		imgui.SameLine()
-		if imgui.Button(u8'Сбросить счётчик', mVec2(148, 24)) then resetTimer() end
+		if imgui.Button(u8'Сбросить счётчик', mVec2(148, 24)) then lfunc.resetTimer() end
 
-		if imgui.Checkbox(u8'Авто-выбор частного самолёта', aUCustP) then
-			setts.main.aUCustP = aUCustP[0]
-			inicfg.save(setts, directIni)
-		end
+		if imgui.Checkbox(u8'Авто-выбор частного самолёта', aUCustP) then setts.main.aUCustP = aUCustP[0] end
 		
-		imgui.PushItemWidth(190); if imgui.SliderInt(u8'Кастомная погода', cw, 0, 45) then setts.weather.cw = cw[0]; inicfg.save(setts, directIni) end
-		imgui.PushItemWidth(190); if imgui.SliderInt(u8'Кастомное время', ct, 0, 23) then setts.weather.ct = ct[0]; inicfg.save(setts, directIni) end
+		imgui.PushItemWidth(190); if imgui.SliderInt(u8'Кастомная погода', cw, 0, 45) then setts.weather.cw = cw[0] end
+		if imgui.SliderInt(u8'Кастомное время', ct, 0, 23) then setts.weather.ct = ct[0] end
+		
+		imgui.SetCursorPos(mVec2(imgui.GetWindowWidth()-34, 4))
+		imgui.PushStyleColor(imgui.Col.Button, zeroClr)
+		imgui.PushStyleColor(imgui.Col.ButtonHovered, zeroClr)
+		imgui.PushStyleColor(imgui.Col.ButtonActive, zeroClr)
+		if imgui.Button(fa('XMARK'), mVec2(30, 30)) then mainSt[0] = false end
+		imgui.PopStyleColor(3)
     imgui.End()
 end)
 
-function sumFormat(a)
-    local b, e = ('%d'):format(a):gsub('^%-', '')
-    local c = b:reverse():gsub('%d%d%d', '%1.')
-    local d = c:reverse():gsub('^%.', '')
-    return (e == 1 and '-' or '')..d
+function lfunc.sumFormat(a, plus)
+	if plus == nil then plus = true end
+	if a == 0 then
+		return 0
+	else
+		local b = ('%d'):format(a)
+		local c = b:reverse():gsub('%d%d%d', '%1.')
+		local d = c:reverse():gsub('^%.', '')
+		if plus then return '+'..d else return d end
+	end
 end
 
 local statsWin = imgui.OnFrame(function() return statsSt[0] and not isGamePaused() end,
 function(self)
 	imgui.SetNextWindowPos(mVec2(setts.main.x, setts.main.y), imgui.Cond.FirstUseEver, mVec2(0, 0))
-	imgui.SetNextWindowSize(mVec2(340, 160), 1)
+	imgui.SetNextWindowSize(mVec2(300, 160))
 	self.HideCursor = true
 	
     imgui.Begin('##StatsWindow', _, imgui.WindowFlags.NoResize + imgui.WindowFlags.NoSavedSettings + imgui.WindowFlags.NoTitleBar + imgui.WindowFlags.NoCollapse)
-		winPos = imgui.GetWindowPos()
+		setts.main.x, setts.main.y = imgui.GetWindowPos().x, imgui.GetWindowPos().y
 		imgui.PushFont(f18)
-			imgui.CenterText(u8'Общая статистика на работе пилота')
+			imgui.CenterText(u8'Работа пилота')
 		imgui.PopFont()
 		
-		imgui.KolhozText(fa('DOLLAR_SIGN'), u8'Общая зарплата: $'..sumFormat(stats.money))
-		imgui.KolhozText(fa('PLANE_ARRIVAL'), u8'Кол-во успешных рейсов: '..tostring(stats.count))
-		imgui.KolhozText(fa('BOX_DOLLAR'), u8'Получено ларцов премии: '..tostring(stats.award))
-		imgui.KolhozText(fa('PLANE_TAIL'), u8'Получено ларцов пилота: '..tostring(stats.pilot))
-		imgui.KolhozText(fa('BOX'), u8'Получено ларцов Tidex: '..tostring(stats.tidex))
+		imgui.KolhozText(fa('DOLLAR_SIGN'), u8'Зарплата: $'..lfunc.sumFormat(stats.money, false))
+		imgui.KolhozText(fa('PLANE_ARRIVAL'), u8'Рейсов: '..lfunc.sumFormat(stats.countD, false)..u8' (День) | '..lfunc.sumFormat(stats.countN, false)..u8' (Ночь)')
+		imgui.KolhozText(fa('BOX_DOLLAR'), u8'Ларцов премии: '..lfunc.sumFormat(stats.award))
+		imgui.KolhozText(fa('PLANE_TAIL'), u8'Ларцов пилота: '..lfunc.sumFormat(stats.pilot))
+		imgui.KolhozText(fa('BOX'), u8'Ларцов Tidex: '..lfunc.sumFormat(stats.tidex))
 		
 		imgui.PushFont(f25)
-			imgui.CenterText(getTimer(timer))
+			imgui.CenterText(lfunc.getTimer(timer))
 		imgui.PopFont()
     imgui.End()
 end)
 
-function counter()
+function lfunc.counter()
 	lua_thread.create(function()
 		while true do
 			wait(1000)
 			if timerSt then 
 				timer = timer + 1
 				setts.timer.count=timer
-				inicfg.save(setts, directIni)
 			end
 		end
 	end)
 end
 
-function resetTimer()
+function lfunc.resetTimer()
 	timer = 0
 	timerSt = false
 	setts.timer.count=timer
 	setts.timer.state=timerSt
-	inicfg.save(setts, directIni)
     msg('Счётчик сброшен.')
 end
 
-function getTimer(time)
+function lfunc.getTimer(time)
     local time2 = 86400 - os.date('%H', 0) * 3600
     if tonumber(time) >= 86400 then onDay = true else onDay = false end
-    return os.date((onDay and math.floor(time / 86400)..u8'д ' or '')..'%H:%M:%S', time + time2)
+    return os.date((onDay and math.floor(time / 86400)..'д ' or '')..'%H:%M:%S', time + time2)
 end
 
 function sampev.onServerMessage(color, text)
 	text = text:gsub('%{......%}', '')
 	text = text:gsub(',', '')
-	
-	if text:find('%[Подсказка%] Рейс успешно завершен! Заработано за рейс: $(%d+) за смену всего: $(%d+)') then
-		local money = text:match('Заработано за рейс: $(%d+)')
-		stats.count = stats.count + 1
-		stats.money = stats.money + money
+	if not text:find('(.+)_(.+)%[(%d+)%]') then
+		if text:find('%[Подсказка%] Рейс успешно завершен! Заработано за рейс: $(%d+) за смену всего: $(%d+)') then
+			local money = text:match('Заработано за рейс: $(%d+)')
+			if day then stats.countD = stats.countD + 1 else stats.countN = stats.countN + 1 end
+			stats.money = stats.money + money
+		end
+		if text:find('Благодаря улучшениям вашей семьи вы получаете дополнительную зарплату: $(%d+)') then
+			local money = text:match('дополнительную зарплату: $(%d+)')
+			stats.money = stats.money + money
+		end
+		if text:find('За работу в рабочее время вашей организации вы получаете прибавку к зарплате: $(%d+).') then
+			local money = text:match('прибавку к зарплате: $(%d+).')
+			stats.money = stats.money + money
+		end
+		if text:find('Получено вознаграждение: (.+)') then
+			local larec = text:match('Получено вознаграждение: (.+)')
+			if larec == 'Ларец Tidex.' then stats.tidex = stats.tidex + 1 end
+			if larec == 'Ларец с премией.' then stats.award = stats.award + 1 end
+			if larec == 'Ларец пилота.' then stats.pilot = stats.pilot + 1 end
+		end
+		setts.stats=stats
 	end
-	if text:find('Благодаря улучшениям вашей семьи вы получаете дополнительную зарплату: $(%d+)') then
-		local money = text:match('дополнительную зарплату: $(%d+)')
-		stats.money = stats.money + money
-	end
-	if text:find('За работу в рабочее время вашей организации вы получаете прибавку к зарплате: $(%d+).') then
-		local money = text:match('прибавку к зарплате: $(%d+).')
-        stats.money = stats.money + money
-    end
-	if text:find('Получено вознаграждение: (.+)') then
-		local larec = text:match('Получено вознаграждение: (.+)')
-		if larec == 'Ларец Tidex.' then stats.tidex = stats.tidex + 1 end
-		if larec == 'Ларец с премией.' then stats.award = stats.award + 1 end
-		if larec == 'Ларец пилота.' then stats.pilot = stats.pilot + 1 end
-	end
-	setts.stats=stats
-	inicfg.save(setts, directIni)
 end
 
-function sampGetListboxItemByText(text, plain)
-    if not sampIsDialogActive() then return -1 end
-        plain = not (plain == false)
-    for i = 0, sampGetListboxItemsCount() - 1 do
-        if sampGetListboxItemText(i):find(text, 1, plain) then
-            return i
-        end
-    end
-    return -1
-end
-
-function sampev.onShowDialog(id, style, title, button1, button2, text)
-	if title:find('Выберите самолет') and aUCustP[0] then
+function sampev.onShowDialog(dialogId, style, title, button1, button2, text)
+	if title:find('Выберите самолет') and dialogId == 1421 and aUCustP[0] then
 		lua_thread.create(function()
 			wait(0)
-			local listbox = sampGetListboxItemByText('Частный самолет')
-			sampSendDialogResponse(id, 1, listbox, nil)
+			local tLines = lfunc.split(text, '\n')
+			sampSendDialogResponse(dialogId, 1, #tLines-2 , nil)
+			wait(1)
 			sampCloseCurrentDialogWithButton(0)
 		end)
+	end
+	if text:match("Текущее время") then
+		day, month, year = text:match("Сегодняшняя дата: 	{2EA42E}(%d+):(%d+):(%d+)")
+		hour, minu, sec = text:match("Текущее время: 	{345690}(%d+):(%d+):(%d+)")
+		datetime = {year = year,month = month,day = day,hour = hour,min = minu,sec = sec}
+		diff = tostring(os.time(datetime)) - os.time()
 	end
 end
 
@@ -317,13 +281,11 @@ end
 
 function onScriptTerminate(script, quitGame)
 	if script == thisScript() then
-        setts.main.x = winPos.x
-        setts.main.y = winPos.y
 		inicfg.save(setts, directIni)
 	end
 end
 
-function theme()
+function lfunc.theme()
 	imgui.SwitchContext()
 	local style = imgui.GetStyle()
 	local colors = style.Colors
@@ -342,27 +304,27 @@ function theme()
     style.FrameRounding = 7
     style.PopupRounding = 7
 
-    colors[clr.Text]                   = mVec4(1.00, 1.00, 1.00, 1.00)
-    colors[clr.TextDisabled]           = mVec4(1.00, 1.00, 1.00, 0.40)
-    colors[clr.WindowBg]               = mVec4(0.00, 0.07, 0.00, 0.90)
-    colors[clr.PopupBg]                = mVec4(0.01, 0.07, 0.02, 0.90)
-    colors[clr.BorderShadow]           = mVec4(0.00, 0.00, 0.00, 0.00)
-    colors[clr.FrameBg]                = mVec4(0.01, 0.10, 0.02, 0.70)
-    colors[clr.FrameBgHovered]         = mVec4(0.01, 0.10, 0.02, 0.90)
-    colors[clr.FrameBgActive]          = mVec4(0.01, 0.10, 0.02, 0.75)
-    colors[clr.CheckMark]              = mVec4(1.00, 1.00, 1.00, 1.00)
-    colors[clr.Button]                 = mVec4(0.00, 0.40, 0.00, 0.24)
-    colors[clr.ButtonHovered]          = mVec4(0.00, 0.60, 0.00, 0.40)
-    colors[clr.ButtonActive]           = mVec4(0.00, 0.50, 0.00, 0.32)
-    colors[clr.Separator]              = mVec4(0.00, 0.40, 0.00, 0.41)
-    colors[clr.SeparatorHovered]       = mVec4(0.00, 0.40, 0.00, 0.78)
-	colors[clr.SeparatorActive]        = mVec4(0.00, 0.40, 0.00, 1.00)
-	colors[clr.SliderGrab]             = mVec4(0.00, 0.25, 0.00, 0.70)
-	colors[clr.SliderGrabActive]       = mVec4(0.00, 0.40, 0.00, 0.70)
+    colors[clr.Text] = mVec4(1.00, 1.00, 1.00, 1.00)
+    colors[clr.TextDisabled] = mVec4(1.00, 1.00, 1.00, 0.40)
+    colors[clr.WindowBg] = mVec4(0.00, 0.07, 0.00, 0.80)
+    colors[clr.PopupBg] = mVec4(0.01, 0.07, 0.02, 0.90)
+    colors[clr.BorderShadow] = mVec4(0.00, 0.00, 0.00, 0.00)
+    colors[clr.FrameBg] = mVec4(0.01, 0.15, 0.02, 0.70)
+    colors[clr.FrameBgHovered] = mVec4(0.01, 0.15, 0.02, 0.90)
+    colors[clr.FrameBgActive] = mVec4(0.01, 0.15, 0.02, 0.75)
+    colors[clr.CheckMark] = mVec4(1.00, 1.00, 1.00, 1.00)
+    colors[clr.Button] = mVec4(0.00, 0.40, 0.00, 0.24)
+    colors[clr.ButtonHovered] = mVec4(0.00, 0.60, 0.00, 0.40)
+    colors[clr.ButtonActive] = mVec4(0.00, 0.50, 0.00, 0.32)
+    colors[clr.Separator] = mVec4(0.00, 0.40, 0.00, 0.41)
+    colors[clr.SeparatorHovered] = mVec4(0.00, 0.40, 0.00, 0.78)
+	colors[clr.SeparatorActive] = mVec4(0.00, 0.40, 0.00, 1.00)
+	colors[clr.SliderGrab] = mVec4(0.00, 0.25, 0.00, 0.70)
+	colors[clr.SliderGrabActive] = mVec4(0.00, 0.40, 0.00, 0.70)
 end
 
 imgui.OnInitialize(function()
-    theme()
+    lfunc.theme()
 	
 	imgui.GetIO().IniFilename = nil
     local config = imgui.ImFontConfig()
@@ -373,3 +335,40 @@ imgui.OnInitialize(function()
 	f18 = imgui.GetIO().Fonts:AddFontFromFileTTF(getFolderPath(0x14) .. '//trebucbd.ttf', 18, _, imgui.GetIO().Fonts:GetGlyphRangesCyrillic())
 	f25 = imgui.GetIO().Fonts:AddFontFromFileTTF(getFolderPath(0x14) .. '//trebucbd.ttf', 25, _, imgui.GetIO().Fonts:GetGlyphRangesCyrillic())
 end)
+
+function lfunc.split(str, delim, plain)
+	local tokens, pos, plain = {}, 1, not (plain == false)
+	repeat
+		local npos, epos = string.find(str, delim, pos, plain)
+		table.insert(tokens, string.sub(str, pos, npos and npos - 1))
+		pos = epos and epos + 1
+	until not pos
+	return tokens
+end
+
+function imgui.CenterText(text, arg)
+	local arg = arg or 0
+	imgui.SetCursorPosX(imgui.GetWindowWidth() / 2 - imgui.CalcTextSize(text).x / 2 )
+	if arg == 0 then imgui.Text(text) elseif arg == 1 then imgui.TextDisabled(text) end
+end
+
+function imgui.KolhozText(sign, text)
+	imgui.SetCursorPosX(16 - imgui.CalcTextSize(sign).x / 2 )
+	imgui.Text(sign)
+	imgui.SameLine()
+	imgui.SetCursorPosX(30)
+	imgui.Text(text)
+end
+
+function imgui.Hint(str_id, hint)
+	if imgui.IsItemHovered() then
+		imgui.PushStyleVarVec2(imgui.StyleVar.WindowPadding, mVec2(10, 10))
+		imgui.BeginTooltip()
+		imgui.PushTextWrapPos(450)
+		imgui.TextColored(imgui.GetStyle().Colors[imgui.Col.ButtonHovered], fa('CIRCLE_INFO')..u8' Подсказка:')
+		imgui.TextUnformatted(hint)
+		imgui.PopTextWrapPos()
+		imgui.EndTooltip()
+		imgui.PopStyleVar()
+	end
+end
