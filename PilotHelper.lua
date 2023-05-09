@@ -1,7 +1,7 @@
 script_name('PilotHelper')
 script_author('Revavi')
-script_version('1.0.3')
-script_version_number(4)
+script_version('1.1.0')
+script_version_number(5)
 
 require("moonloader")
 local encoding = require 'encoding'
@@ -22,24 +22,23 @@ local wDir = getWorkingDirectory()
 local mVec2, mVec4, mn = imgui.ImVec2, imgui.ImVec4, imgui.new
 local zeroClr = mVec4(0,0,0,0)
 
-local statsSt, mainSt = mn.bool(false), mn.bool(false)
+local statsSt, mainSt, mwSy = mn.bool(false), mn.bool(false), 500
 local cw, ct = mn.int(0), mn.int(0)
 
-local timerSt, timer = false, 0
+local aUCustP, showCharacters, lareCost = mn.bool(true), mn.bool(true), mn.bool(false)
 
-local aUCustP = mn.bool(true)
+local nextChar = 'Неизвестно(Обратитесь к разработчику)'
+local firstChar = false
+local oculist = false
 
 local f18, f25 = nil, nil
 
 local day, hour, diff = true, 6, 0
 
-local stats = {
-	tidex = 0,
-	money = 0,
-	award = 0,
-	pilot = 0,
-	countD = 0,
-	countN = 0
+local cost = {
+	tidex = mn.int(0),
+	award = mn.int(0),
+	pilot = mn.int(0)
 }
 
 local dirs = {
@@ -52,10 +51,14 @@ for _, path in pairs(dirs) do if not doesDirectoryExist(wDir..'//'..path) then c
 local directIni = 'Revavi//PilotHelper//Settings.ini'
 local setts = inicfg.load({
 	main = {
-		x = 140,
-		y = select(2, getScreenResolution()) / 2-100,
+		pX = select(1, getScreenResolution())/2-160,
+		pY = select(2, getScreenResolution())/2-143,
 		aUCustP = true,
-		statsSt = false
+		statsSt = false,
+		showCharacters = true,
+		lareCost = false,
+		spX = 10,
+		spY = 350
 	},
 	weather = {
 		cw = 11,
@@ -72,24 +75,28 @@ local setts = inicfg.load({
 	timer = {
 		count = 0,
 		state = false
+	},
+	cost = {
+		tidex = 0,
+		award = 0,
+		pilot = 0
 	}
 }, directIni)
 
-local function msg(arg) if arg ~= nil then return sampAddChatMessage('[PilotHelper] {FFFFFF}'..tostring(arg), 0x009900) end end
+local lastCFG = setts
+
+local function msg(arg) if arg ~= nil then return sampAddChatMessage('[PilotHelper] {FFFFFF}'..tostring(arg), 0x33b333) end end
 
 function lfunc.loadcfg()
+	lareCost[0]=setts.main.lareCost
+	showCharacters[0]=setts.main.showCharacters
+	cost.tidex[0]=setts.cost.tidex
+	cost.pilot[0]=setts.cost.pilot
+	cost.award[0]=setts.cost.award
 	aUCustP[0]=setts.main.aUCustP
 	statsSt[0]=setts.main.statsSt
 	cw[0]=setts.weather.cw
 	ct[0]=setts.weather.ct
-	stats.tidex=setts.stats.tidex
-	stats.money=setts.stats.money
-	stats.award=setts.stats.award
-	stats.pilot=setts.stats.pilot
-	stats.countD=setts.stats.countD
-	stats.countN=setts.stats.countN
-	timer=setts.timer.count
-	timerSt=setts.timer.state
 end
 
 function main()
@@ -98,52 +105,112 @@ function main()
 	
 	lfunc.loadcfg()
 	lfunc.counter()
+	
 	sampRegisterChatCommand('pilot', function() mainSt[0] = not mainSt[0] end)
 	sampRegisterChatCommand('ptimer', fcmd.turnTimer)
 	
 	msg('Скрипт запущен | Открыть меню: /pilot | Автор: '..thisScript().authors[1])
 	
 	while true do
-		wait(0)
+		wait(1)
+		
 		forceWeatherNow(cw[0])
 		memory.write(0xB70153, ct[0], 1, false)
+		
 		hour = tonumber(os.date('%H', os.time() + diff))
 		day = not (hour >= 21 or hour < 5)
+		
+		if setts ~= lastCFG then
+			lastCFG = setts
+			inicfg.save(setts, directIni)
+		end
 	end
 end
 
+local characters = {
+	{[0] = "1545.7757568359", [1] = "11.8175048828", [2] = "А"},
+	{[0] = "1545.9359130859", [1] = "11.8175048828", [2] = "Б"},
+	{[0] = "1546.1060791016", [1] = "11.8175048828", [2] = "В"},
+	{[0] = "1546.0473632813", [1] = "11.3670654297", [2] = "Г"},
+	{[0] = "1546.1975097656", [1] = "11.2869873047", [2] = "Д"},
+	{[0] = "1546.3376464844", [1] = "11.2869873047", [2] = "Е"},
+	{[0] = "1546.7366943359", [1] = "11.8175048828", [2] = "Ё"},
+	{[0] = "1545.8360595703", [1] = "11.6873779297", [2] = "Ж"},
+	{[0] = "1545.9962158203", [1] = "11.6873779297", [2] = "З"},
+	{[0] = "1546.1363525391", [1] = "11.6873779297", [2] = "И"},
+	{[0] = "1546.2764892578", [1] = "11.6873779297", [2] = "Й"},
+	{[0] = "1546.4066162109", [1] = "11.6873779297", [2] = "К"},
+	{[0] = "1546.5367431641", [1] = "11.6873779297", [2] = "Л"},
+	{[0] = "1546.3576660156", [1] = "11.3670654297", [2] = "М"},
+	{[0] = "1545.9465332031", [1] = "11.5672607422", [2] = "Н"},
+	{[0] = "1546.0666503906", [1] = "11.5672607422", [2] = "О"},
+	{[0] = "1546.4077148438", [1] = "11.3670654297", [2] = "П"},
+	{[0] = "1546.2968750000", [1] = "11.5672607422", [2] = "Р"},
+	{[0] = "1546.4169921875", [1] = "11.5672607422", [2] = "С"},
+	{[0] = "1546.5270996094", [1] = "11.5672607422", [2] = "Т"},
+	{[0] = "1546.6271972656", [1] = "11.5672607422", [2] = "У"},
+	{[0] = "1545.9874267578", [1] = "11.4571533203", [2] = "Ф"},
+	{[0] = "1546.1075439453", [1] = "11.4571533203", [2] = "Х"},
+	{[0] = "1546.1674804688", [1] = "11.3670654297", [2] = "Ц"},
+	{[0] = "1546.3277587891", [1] = "11.4571533203", [2] = "Ч"},
+	{[0] = "1546.4578857422", [1] = "11.4571533203", [2] = "Ш"},
+	{[0] = "1546.5880126953", [1] = "11.4571533203", [2] = "Щ"},
+	{[0] = "1546.2662353516", [1] = "11.8175048828", [2] = "Г"},
+	{[0] = "1546.0974121094", [1] = "11.3670654297", [2] = "П"},
+	{[0] = "1546.2076416016", [1] = "11.4571533203", [2] = "Ц"},
+	{[0] = "1546.2275390625", [1] = "11.3670654297", [2] = "Р"},
+	{[0] = "1546.2475585938", [1] = "11.2869873047", [2] = "Ф"},
+	{[0] = "1546.6868896484", [1] = "11.6873779297", [2] = "М"},
+	{[0] = "1546.1867675781", [1] = "11.5672607422", [2] = "П"},
+	{[0] = "1546.4063720703", [1] = "11.8074951172", [2] = "Д"},
+	{[0] = "1546.5378417969", [1] = "11.3670654297", [2] = "Н"},
+	{[0] = "1546.2976074219", [1] = "11.2869873047", [2] = "Й"},
+	{[0] = "1546.1574707031", [1] = "11.2869873047", [2] = "А"},
+	{[0] = "1546.4777832031", [1] = "11.3670654297", [2] = "Д"},
+	{[0] = "1546.2875976563", [1] = "11.3670654297", [2] = "Ф"},
+	{[0] = "1546.1074218750", [1] = "11.2869873047", [2] = "Й"},
+	{[0] = "1546.5765380859", [1] = "11.8074951172", [2] = "Е"},
+	{[0] = "1546.3876953125", [1] = "11.2869873047", [2] = "Ь"},
+	{[0] = "1546.4277343750", [1] = "11.2869873047", [2] = "Ы"},
+	{[0] = "1546.4777832031", [1] = "11.2869873047", [2] = "Х"}
+}
+
+function lfunc.getCharacter(pos)
+	for i, v in ipairs(characters) do
+		if ("%.10f"):format(pos.x) == v[0] and ("%.10f"):format(pos.z) == v[1] then return v[2] end end
+	return 'Неизвестно(Обратитесь к разработчику)'
+end
+
 function fcmd.turnTimer()
-	timerSt = not timerSt
-	setts.timer.state=timerSt
-	msg(timerSt and 'Счётчик запущен' or 'Счётчик остановлен')
+	setts.timer.state = not setts.timer.state
+	msg(setts.timer.state and 'Счётчик запущен' or 'Счётчик остановлен')
 end
 
 function lfunc.resetStat()
-	stats = { tidex = 0, money = 0, award = 0, pilot = 0, countD = 0, countN = 0 }
-	setts.stats=stats
+	setts.stats={ tidex = 0, money = 0, award = 0, pilot = 0, countD = 0, countN = 0 }
 	msg('Статистика сброшена')
 end
 
-local mainWin = imgui.OnFrame(function() return mainSt[0] and not isGamePaused() end,
+local mainWin = imgui.OnFrame(function() return mainSt[0] and not isGamePaused() and not isPauseMenuActive() end,
 function(self)
-	local sw, sh = getScreenResolution()
-	imgui.SetNextWindowPos(mVec2(sw / 2, sh / 2), imgui.Cond.FirstUseEver, mVec2(0.5, 0.5))
-	imgui.SetNextWindowSize(mVec2(320, 214), 1)
+	imgui.SetNextWindowPos(mVec2(setts.main.pX, setts.main.pY), imgui.Cond.FirstUseEver, mVec2(0, 0))
+	imgui.SetNextWindowSize(mVec2(320, mwSy), 1)
 	self.HideCursor = not mainSt[0]
 	
     imgui.Begin('##MainWindow', _, imgui.WindowFlags.NoResize + imgui.WindowFlags.NoSavedSettings + imgui.WindowFlags.NoTitleBar + imgui.WindowFlags.NoCollapse)
+		setts.main.pX, setts.main.pY = imgui.GetWindowPos().x, imgui.GetWindowPos().y
 		imgui.PushFont(f18)
 			imgui.CenterText(u8'PILOT HELPER v'..thisScript().version)
 		imgui.PopFont()
 		imgui.CenterText('by '..thisScript().authors[1], 1)
 		imgui.Separator()
 		
-		imgui.CenterText(fa('CIRCLE_QUESTION'), 1); imgui.Hint('hint', u8'СПИСОК КОМАНД:\n\n/pilot - открыть/закрыть меню\n/ptimer - включить/выключить счётчик\n\nРЕГУЛИРОВКА ВРЕМЕНИ:\nЧтобы скрипт корректно понимал, день сейчас или ночь, нужно перед началом смены звонить службу точного времени.')
+		imgui.CenterText(fa('CIRCLE_QUESTION'), 1); imgui.Hint('hint', u8'СПИСОК КОМАНД:\n\n/pilot - открыть/закрыть меню\n/ptimer - включить/выключить счётчик\n\nРЕГУЛИРОВКА ВРЕМЕНИ:\nЧтобы скрипт корректно понимал, день сейчас или ночь, нужно перед началом смены звонить в службу точного времени.')
 		if imgui.Button(statsSt[0] and u8'Скрыть статистику' or u8'Показать статистику', mVec2(148, 24)) then statsSt[0] = not statsSt[0]; setts.main.statsSt = statsSt[0] end
 		imgui.SameLine()
 		if imgui.Button(u8'Сбросить статистику', mVec2(148, 24)) then lfunc.resetStat() end
 		
-		if imgui.Button(timerSt and u8'Выключить счётчик' or u8'Включить счётчик', mVec2(148, 24)) then fcmd.turnTimer() end
+		if imgui.Button(setts.timer.state and u8'Выключить счётчик' or u8'Включить счётчик', mVec2(148, 24)) then fcmd.turnTimer() end
 		imgui.SameLine()
 		if imgui.Button(u8'Сбросить счётчик', mVec2(148, 24)) then lfunc.resetTimer() end
 
@@ -151,6 +218,31 @@ function(self)
 		
 		imgui.PushItemWidth(190); if imgui.SliderInt(u8'Кастомная погода', cw, 0, 45) then setts.weather.cw = cw[0] end
 		if imgui.SliderInt(u8'Кастомное время', ct, 0, 23) then setts.weather.ct = ct[0] end
+		
+		if imgui.Checkbox(u8'Распознование букв у окулиста', showCharacters) then 
+			setts.main.showCharacters = showCharacters[0]
+			if showCharacters[0] and oculist then
+				msg('Следующая буква: '..(nextChar:find('Неизвестно') and '{FF0000}' or '{00FF00}')..nextChar)
+			end
+		end
+		if imgui.Checkbox(u8'Подсчёт цены ларцов', lareCost) then setts.main.lareCost = lareCost[0] end
+		
+		if lareCost[0] then
+			imgui.Separator()
+			imgui.CenterText(u8'Цены ларцов')
+			if imgui.InputInt(u8'Ларец Tidex', cost.tidex, 0, 0) then
+				if cost.tidex[0] < 0 then cost.tidex[0] = 0 end
+				setts.cost.tidex = cost.tidex[0]
+			end
+			if imgui.InputInt(u8'Ларец Премии', cost.award, 0, 0) then
+				if cost.award[0] < 0 then cost.award[0] = 0 end
+				setts.cost.award = cost.award[0]
+			end
+			if imgui.InputInt(u8'Ларец Пилота', cost.pilot, 0, 0) then
+				if cost.pilot[0] < 0 then cost.pilot[0] = 0 end
+				setts.cost.pilot = cost.pilot[0]
+			end
+		end
 		
 		imgui.SetCursorPos(mVec2(imgui.GetWindowWidth()-34, 4))
 		imgui.PushStyleColor(imgui.Col.Button, zeroClr)
@@ -173,26 +265,33 @@ function lfunc.sumFormat(a, plus)
 	end
 end
 
-local statsWin = imgui.OnFrame(function() return statsSt[0] and not isGamePaused() end,
+local statsWin = imgui.OnFrame(
+function()
+	mwSy = lareCost[0] and 362 or 261
+	return statsSt[0] and not isGamePaused() and not isPauseMenuActive()
+end,
 function(self)
-	imgui.SetNextWindowPos(mVec2(setts.main.x, setts.main.y), imgui.Cond.FirstUseEver, mVec2(0, 0))
+	imgui.SetNextWindowPos(mVec2(setts.main.spX, setts.main.spY), imgui.Cond.FirstUseEver, mVec2(0, 0))
 	imgui.SetNextWindowSize(mVec2(300, 160))
 	self.HideCursor = true
 	
     imgui.Begin('##StatsWindow', _, imgui.WindowFlags.NoResize + imgui.WindowFlags.NoSavedSettings + imgui.WindowFlags.NoTitleBar + imgui.WindowFlags.NoCollapse)
-		setts.main.x, setts.main.y = imgui.GetWindowPos().x, imgui.GetWindowPos().y
+		setts.main.spX, setts.main.spY = imgui.GetWindowPos().x, imgui.GetWindowPos().y
 		imgui.PushFont(f18)
 			imgui.CenterText(u8'Работа пилота')
 		imgui.PopFont()
 		
-		imgui.KolhozText(fa('DOLLAR_SIGN'), u8'Зарплата: $'..lfunc.sumFormat(stats.money, false))
-		imgui.KolhozText(fa('PLANE_ARRIVAL'), u8'Рейсов: '..lfunc.sumFormat(stats.countD, false)..u8' (День) | '..lfunc.sumFormat(stats.countN, false)..u8' (Ночь)')
-		imgui.KolhozText(fa('BOX_DOLLAR'), u8'Ларцов премии: '..lfunc.sumFormat(stats.award))
-		imgui.KolhozText(fa('PLANE_TAIL'), u8'Ларцов пилота: '..lfunc.sumFormat(stats.pilot))
-		imgui.KolhozText(fa('BOX'), u8'Ларцов Tidex: '..lfunc.sumFormat(stats.tidex))
+		imgui.KolhozText(fa('DOLLAR_SIGN'), u8'Зарплата: $'..lfunc.sumFormat(setts.stats.money, false))
+		imgui.KolhozText(fa('PLANE_ARRIVAL'), u8'Рейсов: '..lfunc.sumFormat(setts.stats.countD, false)..u8' (День) | '..lfunc.sumFormat(setts.stats.countN, false)..u8' (Ночь)')
+		imgui.KolhozText(fa('BOX_DOLLAR'), u8'Ларцов премии: '..lfunc.sumFormat(setts.stats.award))
+		if lareCost[0] then imgui.SameLine(); imgui.Text('($'..lfunc.sumFormat(setts.stats.award*cost.award[0])..')') end
+		imgui.KolhozText(fa('PLANE_TAIL'), u8'Ларцов пилота: '..lfunc.sumFormat(setts.stats.pilot))
+		if lareCost[0] then imgui.SameLine(); imgui.Text('($'..lfunc.sumFormat(setts.stats.pilot*cost.pilot[0])..')') end
+		imgui.KolhozText(fa('BOX'), u8'Ларцов Tidex: '..lfunc.sumFormat(setts.stats.tidex))
+		if lareCost[0] then imgui.SameLine(); imgui.Text('($'..lfunc.sumFormat(setts.stats.tidex*cost.tidex[0])..')') end
 		
 		imgui.PushFont(f25)
-			imgui.CenterText(lfunc.getTimer(timer))
+			imgui.CenterText(lfunc.getTimer(setts.timer.count))
 		imgui.PopFont()
     imgui.End()
 end)
@@ -201,19 +300,16 @@ function lfunc.counter()
 	lua_thread.create(function()
 		while true do
 			wait(1000)
-			if timerSt then 
-				timer = timer + 1
-				setts.timer.count=timer
+			if setts.timer.state then 
+				setts.timer.count = setts.timer.count + 1
 			end
 		end
 	end)
 end
 
 function lfunc.resetTimer()
-	timer = 0
-	timerSt = false
-	setts.timer.count=timer
-	setts.timer.state=timerSt
+	setts.timer.count = 0
+	setts.timer.state = false
     msg('Счётчик сброшен.')
 end
 
@@ -227,26 +323,41 @@ function sampev.onServerMessage(color, text)
 	text = text:gsub('%{......%}', '')
 	text = text:gsub(',', '')
 	if not text:find('(.+)_(.+)%[(%d+)%]') then
+		if text:find('Присаживайтесь на стул напротив доски') then firstChar = true end
+		if text:find('Врач--окулист: Произносите как называется выделенная буква') then
+			oculist = true
+			if showCharacters[0] then lua_thread.create(function() wait(50); msg('Следующая буква: '..(nextChar:find('Неизвестно') and '{FF0000}' or '{00FF00}')..nextChar) end) end
+			firstChar = false
+		end
+		if text:find('Врач--окулист: Хорошо со зрением у Вас всё впорядке проходите к') or text:find('Врач--окулист: Увы Вы не правильно назвали выделенную букву') then oculist = false end
 		if text:find('%[Подсказка%] Рейс успешно завершен! Заработано за рейс: $(%d+) за смену всего: $(%d+)') then
 			local money = text:match('Заработано за рейс: $(%d+)')
-			if day then stats.countD = stats.countD + 1 else stats.countN = stats.countN + 1 end
-			stats.money = stats.money + money
+			if day then setts.stats.countD = setts.stats.countD + 1 else setts.stats.countN = setts.stats.countN + 1 end
+			setts.stats.money = setts.stats.money + money
 		end
 		if text:find('Благодаря улучшениям вашей семьи вы получаете дополнительную зарплату: $(%d+)') then
 			local money = text:match('дополнительную зарплату: $(%d+)')
-			stats.money = stats.money + money
+			setts.stats.money = setts.stats.money + money
 		end
 		if text:find('За работу в рабочее время вашей организации вы получаете прибавку к зарплате: $(%d+).') then
 			local money = text:match('прибавку к зарплате: $(%d+).')
-			stats.money = stats.money + money
+			setts.stats.money = setts.stats.money + money
 		end
 		if text:find('Получено вознаграждение: (.+)') then
 			local larec = text:match('Получено вознаграждение: (.+)')
-			if larec == 'Ларец Tidex.' then stats.tidex = stats.tidex + 1 end
-			if larec == 'Ларец с премией.' then stats.award = stats.award + 1 end
-			if larec == 'Ларец пилота.' then stats.pilot = stats.pilot + 1 end
+			if larec == 'Ларец Tidex.' then setts.stats.tidex = setts.stats.tidex + 1 end
+			if larec == 'Ларец с премией.' then setts.stats.award = setts.stats.award + 1 end
+			if larec == 'Ларец пилота.' then setts.stats.pilot = setts.stats.pilot + 1 end
 		end
-		setts.stats=stats
+	end
+end
+
+function sampev.onMoveObject(id, lastpos, newpos, speed, rot)
+	if speed == 2 and isCharInArea2d(1, 1548, 1395, 1544, 1399, false) then
+		if oculist or firstChar then 
+			nextChar = lfunc.getCharacter(newpos)
+			if showCharacters[0] and not firstChar then msg('Следующая буква: '..(nextChar:find('Неизвестно') and '{FF0000}' or '{00FF00}')..nextChar) end
+		end
 	end
 end
 
@@ -306,21 +417,21 @@ function lfunc.theme()
 
     colors[clr.Text] = mVec4(1.00, 1.00, 1.00, 1.00)
     colors[clr.TextDisabled] = mVec4(1.00, 1.00, 1.00, 0.40)
-    colors[clr.WindowBg] = mVec4(0.00, 0.07, 0.00, 0.80)
-    colors[clr.PopupBg] = mVec4(0.01, 0.07, 0.02, 0.90)
-    colors[clr.BorderShadow] = mVec4(0.00, 0.00, 0.00, 0.00)
-    colors[clr.FrameBg] = mVec4(0.01, 0.15, 0.02, 0.70)
-    colors[clr.FrameBgHovered] = mVec4(0.01, 0.15, 0.02, 0.90)
-    colors[clr.FrameBgActive] = mVec4(0.01, 0.15, 0.02, 0.75)
+    colors[clr.WindowBg] = mVec4(0.01, 0.10, 0.02, 0.80)
+    colors[clr.PopupBg] = mVec4(0.01, 0.10, 0.02, 0.80)
+    colors[clr.BorderShadow] = zeroClr
+    colors[clr.FrameBg] = mVec4(0.01, 0.16, 0.02, 0.70)
+    colors[clr.FrameBgHovered] = mVec4(0.01, 0.16, 0.02, 0.90)
+    colors[clr.FrameBgActive] = mVec4(0.01, 0.16, 0.02, 0.75)
     colors[clr.CheckMark] = mVec4(1.00, 1.00, 1.00, 1.00)
     colors[clr.Button] = mVec4(0.00, 0.40, 0.00, 0.24)
     colors[clr.ButtonHovered] = mVec4(0.00, 0.60, 0.00, 0.40)
     colors[clr.ButtonActive] = mVec4(0.00, 0.50, 0.00, 0.32)
     colors[clr.Separator] = mVec4(0.00, 0.40, 0.00, 0.41)
-    colors[clr.SeparatorHovered] = mVec4(0.00, 0.40, 0.00, 0.78)
-	colors[clr.SeparatorActive] = mVec4(0.00, 0.40, 0.00, 1.00)
-	colors[clr.SliderGrab] = mVec4(0.00, 0.25, 0.00, 0.70)
-	colors[clr.SliderGrabActive] = mVec4(0.00, 0.40, 0.00, 0.70)
+    colors[clr.SeparatorHovered] = mVec4(0.00, 0.40, 0.00, 0.41)
+	colors[clr.SeparatorActive] = mVec4(0.00, 0.40, 0.00, 0.41)
+	colors[clr.SliderGrab] = mVec4(0.03, 0.20, 0.02, 0.80)
+	colors[clr.SliderGrabActive] = mVec4(0.02, 0.20, 0.01, 0.60)
 end
 
 imgui.OnInitialize(function()
