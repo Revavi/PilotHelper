@@ -341,7 +341,7 @@ end
 function lfunc.getTimer(time)
     local time2 = 86400 - os.date('%H', 0) * 3600
     if tonumber(time) >= 86400 then onDay = true else onDay = false end
-    return os.date((onDay and math.floor(time / 86400)..'ä ' or '')..'%H:%M:%S', time + time2)
+    return os.date((onDay and math.floor(time / 86400)..u8'ä ' or '')..'%H:%M:%S', time + time2)
 end
 
 function sampev.onServerMessage(color, text)
