@@ -1,5 +1,5 @@
 # Pilot Helper (V 1.1)
-![](logo.png)
+![Лого Pilot Helper](logo.png)
 
 Этот скрипт создан для ведения статистики и облегчения работы пилота в _SA-MP(R3) **Arizona RP**_.
 
@@ -16,6 +16,15 @@ _Работает только с помощью **moonloader**_.
 
 В разработке:
  - *Отсутствует*
+
+## Скриншоты меню
+**Основное меню:**
+
+![Основное меню](main_window.png)
+
+**Окно статистики:**
+
+![Окно статистики](statistics_window.png)
 
 ## Необходимые библиотеки
  - **[mimgui](https://github.com/THE-FYP/mimgui/releases/download/v1.7.0/mimgui-v1.7.0.zip)**
