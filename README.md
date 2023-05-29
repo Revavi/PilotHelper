@@ -58,7 +58,7 @@ _Работает только с помощью **moonloader**_.
 
 ## Связь с разработчиком
 
-**Discord: _Revavi#6149_**
+**Discord: _Revavi#6149_**  
 [**telegram**](https://t.me/SosuPercocet)  
 [**VK**](https://vk.com/revavi)
 
