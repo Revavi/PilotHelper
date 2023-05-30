@@ -60,7 +60,7 @@ _Работает только с помощью **moonloader**_.
 
 **Discord: _Revavi#6149_**  
 [**telegram**](https://t.me/SosuPercocet)  
-[**VK**](https://vk.com/revavi)
+[**VK**](https://vk.com/revavi)  
 [**DonationAlerts**](https://www.donationalerts.com/r/revavi_)
 
 ## Список изменений
