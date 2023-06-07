@@ -1,58 +1,28 @@
-script_name('PilotHelper')
+script_name('Pilot Helper')
 script_author('Revavi')
-script_version('1.1.1')
-script_version_number(6)
+script_version('1.1.2')
+script_version_number(7)
 
-require("moonloader")
 local encoding = require 'encoding'
 local imgui = require 'mimgui'
 local fa = require 'fAwesome6'
 local inicfg = require 'inicfg'
-local vkeys = require 'vkeys'
 local sampev = require 'lib.samp.events'
 local memory = require 'memory'
 
 encoding.default = 'CP1251'
 local u8 = encoding.UTF8
 
-local lfunc, fcmd = {}, {}
-
 local wDir, this = getWorkingDirectory(), thisScript()
 
 local mVec2, mVec4, mn = imgui.ImVec2, imgui.ImVec4, imgui.new
 local zeroClr = mVec4(0,0,0,0)
 
-local statsSt, mainSt, mwSy = mn.bool(false), mn.bool(false), 500
-local cw, ct = mn.int(0), mn.int(0)
-
-local aUCustP, showCharacters, lareCost = mn.bool(true), mn.bool(true), mn.bool(false)
-
-local nextChar = 'Неизвестно(Обратитесь к разработчику)'
-local firstChar = false
-local oculist = false
-
-local f18, f25 = nil, nil
-
-local day, hour, diff = true, 6, 0
-
-local cost = {
-	tidex = mn.int(0),
-	award = mn.int(0),
-	pilot = mn.int(0)
-}
-
-local dirs = {
-	cfg = 'config',
-	dev = 'config//Revavi',
-	main = 'config//Revavi//Pilot Helper'
-}
-for _, path in pairs(dirs) do if not doesDirectoryExist(wDir..'//'..path) then createDirectory(wDir..'//'..path) end end
-
-local directIni = 'Revavi//Pilot Helper//Settings.ini'
+local directIni = 'Pilot Helper//Settings.ini'
 local setts = inicfg.load({
 	main = {
 		pX = select(1, getScreenResolution())/2-160,
-		pY = select(2, getScreenResolution())/2-143,
+		pY = select(2, getScreenResolution())/2-121,
 		aUCustP = true,
 		statsSt = false,
 		showCharacters = true,
@@ -86,154 +56,120 @@ local stats = inicfg.load({
 		count = 0,
 		state = false
 	}
-}, 'Revavi//Pilot Helper//Statistics.ini')
+}, 'Pilot Helper//Statistics.ini')
+
+local statsSt, mainSt, mwSy = mn.bool(setts.main.statsSt), mn.bool(false), 500
+local cw, ct = mn.int(setts.custom.cw), mn.int(setts.custom.ct)
+
+local aUCustP, showCharacters, lareCost = mn.bool(setts.main.aUCustP), mn.bool(setts.main.showCharacters), mn.bool(setts.main.lareCost)
+
+local nextChar = 'Неизвестно(Обратитесь к разработчику)'
+local firstChar = false
+local oculist = false
+
+local f18, f25 = nil, nil
+
+local day, hour, diff = true, 6, 0
+
+local cost = {
+	tidex = mn.int(setts.cost.tidex),
+	award = mn.int(setts.cost.award),
+	pilot = mn.int(setts.cost.pilot)
+}
 
 local proxyCfg = {} -- Спасибо why ega
 setmetatable(proxyCfg, {
-	__index = function(self, k)
-        inicfg.save(setts, directIni)
-        return setts[k]
-    end,
-    __newindex = function(self, k, v)
-        inicfg.save(setts, directIni)
-        setts[k] = v
-   end
-})
+	__index = function(self, k) inicfg.save(setts, directIni)
+		return setts[k] end,
+    __newindex = function(self, k, v) inicfg.save(setts, directIni)
+        setts[k] = v end })
 local proxyStats = {}
 setmetatable(proxyStats, {
-	__index = function(self, k)
-        inicfg.save(stats, 'Revavi//Pilot Helper//Statistics.ini')
-        return stats[k]
-    end,
-    __newindex = function(self, k, v)
-        inicfg.save(stats, 'Revavi//Pilot Helper//Statistics.ini')
-        stats[k] = v
-   end
-})
+	__index = function(self, k) inicfg.save(stats, 'Pilot Helper//Statistics.ini')
+		return stats[k] end,
+	__newindex = function(self, k, v) inicfg.save(stats, 'Pilot Helper//Statistics.ini')
+		stats[k] = v end })
 
 local function msg(arg) if arg ~= nil then return sampAddChatMessage('[PilotHelper] {FFFFFF}'..tostring(arg), 0x33b333) end end
-
-function lfunc.loadcfg()
-	lareCost[0]=setts.main.lareCost
-	showCharacters[0]=setts.main.showCharacters
-	cost.tidex[0]=setts.cost.tidex
-	cost.pilot[0]=setts.cost.pilot
-	cost.award[0]=setts.cost.award
-	aUCustP[0]=setts.main.aUCustP
-	statsSt[0]=setts.main.statsSt
-	cw[0]=setts.custom.cw
-	ct[0]=setts.custom.ct
-end
 
 function main()
 	if not isSampLoaded() or not isSampfuncsLoaded() then return end
 	repeat wait(0) until isSampAvailable()
-	
-	lfunc.loadcfg()
-	lfunc.counter()
+
+	mwSy = lareCost[0] and 342 or 242
+	lua_thread.create(function() while true do wait(1000) if stats.timer.state then stats.timer.count = stats.timer.count+1 end end end)
 	
 	sampRegisterChatCommand('pilot', function() mainSt[0] = not mainSt[0] end)
-	sampRegisterChatCommand('ptimer', fcmd.turnTimer)
+	sampRegisterChatCommand('ptimer', turnTimer)
 	
-	msg('Скрипт запущен | Открыть меню: /pilot | Автор: '..table.concat(this.authors, ", "))
+	msg('Скрипт запущен | Открыть меню: /pilot | Автор: '..table.concat(this.authors, ', '))
 	
-	while true do
-		wait(0)
-		
-		if setts.custom.tw then forceWeatherNow(cw[0]) end
+	while true do wait(0)
+		if setts.custom.tw and memory.getint8(0xC81320, true) ~= cw[0] then forceWeatherNow(cw[0]) end
 		if setts.custom.tt then memory.write(0xB70153, ct[0], 1, false) end
-		
-		hour = tonumber(os.date('%H', os.time() + diff))
-		day = not (hour >= 21 or hour < 5)
 	end
 end
 
 local characters = {
-	{[0] = "1545.7757568359", [1] = "11.8175048828", [2] = "А"},
-	{[0] = "1545.9359130859", [1] = "11.8175048828", [2] = "Б"},
-	{[0] = "1546.1060791016", [1] = "11.8175048828", [2] = "В"},
-	{[0] = "1546.0473632813", [1] = "11.3670654297", [2] = "Г"},
-	{[0] = "1546.1975097656", [1] = "11.2869873047", [2] = "Д"},
-	{[0] = "1546.3376464844", [1] = "11.2869873047", [2] = "Е"},
-	{[0] = "1546.7366943359", [1] = "11.8175048828", [2] = "Ё"},
-	{[0] = "1545.8360595703", [1] = "11.6873779297", [2] = "Ж"},
-	{[0] = "1545.9962158203", [1] = "11.6873779297", [2] = "З"},
-	{[0] = "1546.1363525391", [1] = "11.6873779297", [2] = "И"},
-	{[0] = "1546.2764892578", [1] = "11.6873779297", [2] = "Й"},
-	{[0] = "1546.4066162109", [1] = "11.6873779297", [2] = "К"},
-	{[0] = "1546.5367431641", [1] = "11.6873779297", [2] = "Л"},
-	{[0] = "1546.3576660156", [1] = "11.3670654297", [2] = "М"},
-	{[0] = "1545.9465332031", [1] = "11.5672607422", [2] = "Н"},
-	{[0] = "1546.0666503906", [1] = "11.5672607422", [2] = "О"},
-	{[0] = "1546.4077148438", [1] = "11.3670654297", [2] = "П"},
-	{[0] = "1546.2968750000", [1] = "11.5672607422", [2] = "Р"},
-	{[0] = "1546.4169921875", [1] = "11.5672607422", [2] = "С"},
-	{[0] = "1546.5270996094", [1] = "11.5672607422", [2] = "Т"},
-	{[0] = "1546.6271972656", [1] = "11.5672607422", [2] = "У"},
-	{[0] = "1545.9874267578", [1] = "11.4571533203", [2] = "Ф"},
-	{[0] = "1546.1075439453", [1] = "11.4571533203", [2] = "Х"},
-	{[0] = "1546.1674804688", [1] = "11.3670654297", [2] = "Ц"},
-	{[0] = "1546.3277587891", [1] = "11.4571533203", [2] = "Ч"},
-	{[0] = "1546.4578857422", [1] = "11.4571533203", [2] = "Ш"},
-	{[0] = "1546.5880126953", [1] = "11.4571533203", [2] = "Щ"},
-	{[0] = "1546.2662353516", [1] = "11.8175048828", [2] = "Г"},
-	{[0] = "1546.0974121094", [1] = "11.3670654297", [2] = "П"},
-	{[0] = "1546.2076416016", [1] = "11.4571533203", [2] = "Ц"},
-	{[0] = "1546.2275390625", [1] = "11.3670654297", [2] = "Р"},
-	{[0] = "1546.2475585938", [1] = "11.2869873047", [2] = "Ф"},
-	{[0] = "1546.6868896484", [1] = "11.6873779297", [2] = "М"},
-	{[0] = "1546.1867675781", [1] = "11.5672607422", [2] = "П"},
-	{[0] = "1546.4063720703", [1] = "11.8074951172", [2] = "Д"},
-	{[0] = "1546.5378417969", [1] = "11.3670654297", [2] = "Н"},
-	{[0] = "1546.2976074219", [1] = "11.2869873047", [2] = "Й"},
-	{[0] = "1546.1574707031", [1] = "11.2869873047", [2] = "А"},
-	{[0] = "1546.4777832031", [1] = "11.3670654297", [2] = "Д"},
-	{[0] = "1546.2875976563", [1] = "11.3670654297", [2] = "Ф"},
-	{[0] = "1546.1074218750", [1] = "11.2869873047", [2] = "Й"},
-	{[0] = "1546.5765380859", [1] = "11.8074951172", [2] = "Е"},
-	{[0] = "1546.3876953125", [1] = "11.2869873047", [2] = "Ь"},
-	{[0] = "1546.4277343750", [1] = "11.2869873047", [2] = "Ы"},
-	{[0] = "1546.4777832031", [1] = "11.2869873047", [2] = "Х"}
+	{x="1545.7757568359", z="11.8175048828", str="А"}, {x="1545.9359130859", z="11.8175048828", str="Б"},
+	{x="1546.1060791016", z="11.8175048828", str="В"}, {x="1546.0473632813", z="11.3670654297", str="Г"},
+	{x="1546.1975097656", z="11.2869873047", str="Д"}, {x="1546.3376464844", z="11.2869873047", str="Е"},
+	{x="1546.7366943359", z="11.8175048828", str="Ё"}, {x="1545.8360595703", z="11.6873779297", str="Ж"},
+	{x="1545.9962158203", z="11.6873779297", str="З"}, {x="1546.1363525391", z="11.6873779297", str="И"},
+	{x="1546.2764892578", z="11.6873779297", str="Й"}, {x="1546.4066162109", z="11.6873779297", str="К"},
+	{x="1546.5367431641", z="11.6873779297", str="Л"}, {x="1546.3576660156", z="11.3670654297", str="М"},
+	{x="1545.9465332031", z="11.5672607422", str="Н"}, {x="1546.0666503906", z="11.5672607422", str="О"},
+	{x="1546.4077148438", z="11.3670654297", str="П"}, {x="1546.2968750000", z="11.5672607422", str="Р"},
+	{x="1546.4169921875", z="11.5672607422", str="С"}, {x="1546.5270996094", z="11.5672607422", str="Т"},
+	{x="1546.6271972656", z="11.5672607422", str="У"}, {x="1545.9874267578", z="11.4571533203", str="Ф"},
+	{x="1546.1075439453", z="11.4571533203", str="Х"}, {x="1546.1674804688", z="11.3670654297", str="Ц"},
+	{x="1546.3277587891", z="11.4571533203", str="Ч"}, {x="1546.4578857422", z="11.4571533203", str="Ш"},
+	{x="1546.5880126953", z="11.4571533203", str="Щ"}, {x="1546.2662353516", z="11.8175048828", str="Г"},
+	{x="1546.0974121094", z="11.3670654297", str="П"}, {x="1546.2076416016", z="11.4571533203", str="Ц"},
+	{x="1546.2275390625", z="11.3670654297", str="Р"}, {x="1546.2475585938", z="11.2869873047", str="Ф"},
+	{x="1546.6868896484", z="11.6873779297", str="М"}, {x="1546.1867675781", z="11.5672607422", str="П"},
+	{x="1546.4063720703", z="11.8074951172", str="Д"}, {x="1546.5378417969", z="11.3670654297", str="Н"},
+	{x="1546.2976074219", z="11.2869873047", str="Й"}, {x="1546.1574707031", z="11.2869873047", str="А"},
+	{x="1546.4777832031", z="11.3670654297", str="Д"}, {x="1546.2875976563", z="11.3670654297", str="Ф"},
+	{x="1546.1074218750", z="11.2869873047", str="Й"}, {x="1546.5765380859", z="11.8074951172", str="Е"},
+	{x="1546.3876953125", z="11.2869873047", str="Ь"}, {x="1546.4277343750", z="11.2869873047", str="Ы"},
+	{x="1546.4777832031", z="11.2869873047", str="Х"}
 }
 
-function lfunc.getCharacter(pos)
-	for i, v in ipairs(characters) do
-		if ("%.10f"):format(pos.x) == v[0] and ("%.10f"):format(pos.z) == v[1] then return v[2] end end
+function getCharacter(pos)
+	for _, v in pairs(characters) do
+		if ("%.10f"):format(pos.x) == v.x and ("%.10f"):format(pos.z) == v.z then return v.str end end
 	return 'Неизвестно(Обратитесь к разработчику)'
 end
 
-function fcmd.turnTimer()
+function turnTimer()
 	proxyStats.timer.state = not stats.timer.state
 	msg(stats.timer.state and 'Счётчик запущен' or 'Счётчик остановлен')
 end
 
-function lfunc.resetStat()
-	proxyStats.main={ tidex = 0, money = 0, award = 0, pilot = 0, countD = 0, countN = 0 }
+function resetStat()
+	proxyStats.main={tidex=0, money=0, award=0, pilot=0, countD=0, countN=0}
 	msg('Статистика сброшена')
 end
 
 local mainWin = imgui.OnFrame(function() return mainSt[0] and not isGamePaused() and not isPauseMenuActive() end,
 function(self)
-	mwSy = lareCost[0] and 342 or 242
 	imgui.SetNextWindowPos(mVec2(setts.main.pX, setts.main.pY), imgui.Cond.FirstUseEver, mVec2(0, 0))
 	imgui.SetNextWindowSize(mVec2(320, mwSy), 1)
 	self.HideCursor = not mainSt[0]
 	
     imgui.Begin('##MainWindow', _, imgui.WindowFlags.NoResize + imgui.WindowFlags.NoSavedSettings + imgui.WindowFlags.NoTitleBar + imgui.WindowFlags.NoCollapse)
 		setts.main.pX, setts.main.pY = imgui.GetWindowPos().x, imgui.GetWindowPos().y
-		imgui.PushFont(f18)
-			imgui.CenterText(u8'PILOT HELPER v'..this.version)
-		imgui.PopFont()
-		imgui.CenterText('by '..table.concat(this.authors, ", "), 1)
-		imgui.Separator()
+		imgui.PushFont(f18) imgui.CenterText(this.name:upper()..' v'..this.version) imgui.PopFont()
+		imgui.CenterText('by '..table.concat(this.authors, ', '), 1) imgui.Separator()
 		
-		if imgui.Button(statsSt[0] and u8'Скрыть статистику' or u8'Показать статистику', mVec2(148, 24)) then statsSt[0] = not statsSt[0]; proxyCfg.main.statsSt = statsSt[0] end
+		if imgui.Button(statsSt[0] and u8'Скрыть статистику' or u8'Показать статистику', mVec2(148, 24)) then statsSt[0] = not statsSt[0] proxyCfg.main.statsSt = statsSt[0] end
 		imgui.SameLine()
-		if imgui.Button(u8'Сбросить статистику', mVec2(148, 24)) then lfunc.resetStat() end
+		if imgui.Button(u8'Сбросить статистику', mVec2(148, 24)) then resetStat() end
 		
-		if imgui.Button(stats.timer.state and u8'Выключить счётчик' or u8'Включить счётчик', mVec2(148, 24)) then fcmd.turnTimer() end
+		if imgui.Button(stats.timer.state and u8'Выключить счётчик' or u8'Включить счётчик', mVec2(148, 24)) then turnTimer() end
 		imgui.SameLine()
-		if imgui.Button(u8'Сбросить счётчик', mVec2(148, 24)) then lfunc.resetTimer() end
+		if imgui.Button(u8'Сбросить счётчик', mVec2(148, 24)) then resetTimer() end
 
 		if imgui.Checkbox(u8'Авто-выбор частного самолёта', aUCustP) then proxyCfg.main.aUCustP = aUCustP[0] end
 		
@@ -249,7 +185,7 @@ function(self)
 				msg('Следующая буква: '..(nextChar:find('Неизвестно') and '{FF0000}' or '{00FF00}')..nextChar)
 			end
 		end
-		if imgui.Checkbox(u8'Подсчёт цены ларцов', lareCost) then proxyCfg.main.lareCost = lareCost[0] end
+		if imgui.Checkbox(u8'Подсчёт цены ларцов', lareCost) then proxyCfg.main.lareCost = lareCost[0] mwSy = lareCost[0] and 342 or 242 end
 		
 		if lareCost[0] then
 			imgui.PushItemWidth(210)
@@ -282,15 +218,12 @@ function(self)
     imgui.End()
 end)
 
-function lfunc.sumFormat(a, plus)
+function sumFormat(a, plus)
 	if plus == nil then plus = true end
-	if a == 0 then
-		return 0
+	if a == 0 then return 0
 	else
-		local b = ('%d'):format(a)
-		local c = b:reverse():gsub('%d%d%d', '%1.')
-		local d = c:reverse():gsub('^%.', '')
-		if plus then return '+'..d else return d end
+		local b = ('%d'):format(a):reverse():gsub('%d%d%d', '%1.'):reverse():gsub('^%.', '')
+		if plus then return '+'..b else return b end
 	end
 end
 
@@ -302,43 +235,28 @@ function(self)
 	
     imgui.Begin('##StatsWindow', _, imgui.WindowFlags.NoResize + imgui.WindowFlags.NoSavedSettings + imgui.WindowFlags.NoTitleBar + imgui.WindowFlags.NoCollapse)
 		setts.main.spX, setts.main.spY = imgui.GetWindowPos().x, imgui.GetWindowPos().y
-		imgui.PushFont(f18)
-			imgui.CenterText(u8'Работа Пилота')
-		imgui.PopFont()
+		imgui.PushFont(f18) imgui.CenterText(u8'Работа Пилота') imgui.PopFont()
 		
-		imgui.KolhozText(fa('DOLLAR_SIGN'), 'Зарплата:{ffffff} $'..lfunc.sumFormat(stats.main.money, false))
-		imgui.KolhozText(fa('PLANE_ARRIVAL'), 'Рейсов: {ffffff}'..lfunc.sumFormat(stats.main.countD, false)..' {ffffff66}(День) {ffffff}| '..lfunc.sumFormat(stats.main.countN, false)..' {ffffff66}(Ночь)')
-		imgui.KolhozText(fa('BOX_DOLLAR'), 'Ларцов премии: {ffffff}'..lfunc.sumFormat(stats.main.award))
-		if lareCost[0] then imgui.SameLine(); imgui.TextDisabled('($'..lfunc.sumFormat(stats.main.award*cost.award[0])..')') end
-		imgui.KolhozText(fa('PLANE_TAIL'), 'Ларцов пилота: {ffffff}'..lfunc.sumFormat(stats.main.pilot))
-		if lareCost[0] then imgui.SameLine(); imgui.TextDisabled('($'..lfunc.sumFormat(stats.main.pilot*cost.pilot[0])..')') end
-		imgui.KolhozText(fa('BOX'), 'Ларцов Tidex: {ffffff}'..lfunc.sumFormat(stats.main.tidex))
-		if lareCost[0] then imgui.SameLine(); imgui.TextDisabled('($'..lfunc.sumFormat(stats.main.tidex*cost.tidex[0])..')') end
+		imgui.KolhozText(fa('DOLLAR_SIGN'), 'Зарплата:{ffffff} $'..sumFormat(stats.main.money, false))
+		imgui.KolhozText(fa('PLANE_ARRIVAL'), 'Рейсов: {ffffff}'..sumFormat(stats.main.countD, false)..' {ffffff66}(День) {ffffff}| '..sumFormat(stats.main.countN, false)..' {ffffff66}(Ночь)')
+		imgui.KolhozText(fa('BOX_DOLLAR'), 'Ларцов премии: {ffffff}'..sumFormat(stats.main.award))
+		if lareCost[0] then imgui.SameLine() imgui.TextDisabled('($'..sumFormat(stats.main.award*cost.award[0])..')') end
+		imgui.KolhozText(fa('PLANE_TAIL'), 'Ларцов пилота: {ffffff}'..sumFormat(stats.main.pilot))
+		if lareCost[0] then imgui.SameLine() imgui.TextDisabled('($'..sumFormat(stats.main.pilot*cost.pilot[0])..')') end
+		imgui.KolhozText(fa('BOX'), 'Ларцов Tidex: {ffffff}'..sumFormat(stats.main.tidex))
+		if lareCost[0] then imgui.SameLine() imgui.TextDisabled('($'..sumFormat(stats.main.tidex*cost.tidex[0])..')') end
 		
-		imgui.PushFont(f25)
-			imgui.CenterText(lfunc.getTimer(stats.timer.count))
-		imgui.PopFont()
+		imgui.PushFont(f25) imgui.CenterText(getTimer(stats.timer.count)) imgui.PopFont()
     imgui.End()
 end)
 
-function lfunc.counter()
-	lua_thread.create(function()
-		while true do
-			wait(1000)
-			if stats.timer.state then 
-				stats.timer.count = stats.timer.count + 1
-			end
-		end
-	end)
-end
-
-function lfunc.resetTimer()
+function resetTimer()
 	proxyStats.timer.count = 0
 	proxyStats.timer.state = false
     msg('Счётчик сброшен.')
 end
 
-function lfunc.getTimer(time)
+function getTimer(time)
     local time2 = 86400 - os.date('%H', 0) * 3600
     if tonumber(time) >= 86400 then onDay = true else onDay = false end
     return os.date((onDay and math.floor(time / 86400)..u8'д ' or '')..'%H:%M:%S', time + time2)
@@ -346,28 +264,24 @@ end
 
 function sampev.onServerMessage(color, text)
 	text = text:gsub('%{......%}', '')
-	text = text:gsub(',', '')
 	if not text:find('(.+)_(.+)%[(%d+)%]') then
 		if text:find('Присаживайтесь на стул напротив доски') then firstChar = true end
-		if text:find('Врач--окулист: Произносите как называется выделенная буква') then
-			oculist = true
-			if showCharacters[0] then lua_thread.create(function() wait(50); msg('Следующая буква: '..(nextChar:find('Неизвестно') and '{FF0000}' or '{00FF00}')..nextChar) end) end
-			firstChar = false
-		end
-		if text:find('Врач--окулист: Хорошо со зрением у Вас всё впорядке проходите к') or text:find('Врач--окулист: Увы Вы не правильно назвали выделенную букву') then oculist=false nextChar='Неизвестно(Обратитесь к разработчику)' end
+		if text:find('Врач--окулист: Произносите%, как называется выделенная буква') then oculist = true
+			if showCharacters[0] then lua_thread.create(function() wait(50) msg('Первая буква: '..(nextChar:find('Неизвестно') and '{FF0000}' or '{00FF00}')..nextChar) end) end
+			firstChar = false end
+		if text:find('Врач--окулист: Хорошо%, со зрением у Вас всё впорядке%, проходите к') or text:find('Врач--окулист: Увы%, Вы не правильно назвали выделенную букву') then oculist=false nextChar='Неизвестно(Обратитесь к разработчику)' end
 		if text:find('%[Подсказка%] Рейс успешно завершен! Заработано за рейс: $(%d+) за смену всего: $(%d+)') then
 			local money = text:match('Заработано за рейс: $(%d+)')
+			hour = tonumber(os.date('%H', os.time() + diff))
+			day = not (hour >= 21 or hour < 5)
 			if day then proxyStats.main.countD = stats.main.countD + 1 else proxyStats.main.countN = stats.main.countN + 1 end
-			proxyStats.main.money = stats.main.money + money
-		end
+			proxyStats.main.money = stats.main.money + money end
 		if text:find('Благодаря улучшениям вашей семьи вы получаете дополнительную зарплату: $(%d+)') then
 			local money = text:match('дополнительную зарплату: $(%d+)')
-			proxyStats.main.money = stats.main.money + money
-		end
+			proxyStats.main.money = stats.main.money + money end
 		if text:find('За работу в рабочее время вашей организации вы получаете прибавку к зарплате: $(%d+).') then
 			local money = text:match('прибавку к зарплате: $(%d+).')
-			proxyStats.main.money = stats.main.money + money
-		end
+			proxyStats.main.money = stats.main.money + money end
 		if text:find('Получено вознаграждение: (.+)') then
 			local larec = text:match('Получено вознаграждение: (.+)')
 			if larec == 'Ларец Tidex.' then proxyStats.main.tidex = stats.main.tidex + 1 end
@@ -379,10 +293,8 @@ end
 
 function sampev.onMoveObject(id, lastpos, newpos, speed, rot)
 	if speed == 2 and isCharInArea2d(1, 1548, 1395, 1544, 1399, false) then
-		if oculist or firstChar then 
-			nextChar = lfunc.getCharacter(newpos)
-			if showCharacters[0] and not firstChar then msg('Следующая буква: '..(nextChar:find('Неизвестно') and '{FF0000}' or '{00FF00}')..nextChar) end
-		end
+		nextChar = getCharacter(newpos)
+		if oculist and showCharacters[0] and not firstChar then msg('Следующая буква: '..(nextChar:find('Неизвестно') and '{FF0000}' or '{00FF00}')..nextChar) end
 	end
 end
 
@@ -390,38 +302,31 @@ function sampev.onShowDialog(dialogId, style, title, button1, button2, text)
 	if title:find('Выберите самолет') and dialogId == 1421 and aUCustP[0] then
 		lua_thread.create(function()
 			wait(0)
-			local tLines = lfunc.split(text, '\n')
+			local tLines = split(text, '\n')
 			sampSendDialogResponse(dialogId, 1, #tLines-2 , nil)
 			wait(1)
 			sampCloseCurrentDialogWithButton(0)
 		end)
 	end
-	if text:match("Текущее время") then
-		day, month, year = text:match("Сегодняшняя дата: 	{2EA42E}(%d+):(%d+):(%d+)")
-		hour, minu, sec = text:match("Текущее время: 	{345690}(%d+):(%d+):(%d+)")
-		datetime = {year = year,month = month,day = day,hour = hour,min = minu,sec = sec}
+	if text:match('Текущее время') then
+		local day, month, year = text:match('Сегодняшняя дата: 	{2EA42E}(%d+):(%d+):(%d+)')
+		local hour, min, sec = text:match('Текущее время: 	{345690}(%d+):(%d+):(%d+)')
+		local datetime = {year = year,month = month,day = day,hour = hour,min = min,sec = sec}
 		diff = tostring(os.time(datetime)) - os.time()
 	end
 end
 
 function onWindowMessage(msg, arg, argg)
-    if msg == 0x100 or msg == 0x101 then
-        if (arg == vkeys.VK_ESCAPE and mainSt[0]) and not isPauseMenuActive() then
-            consumeWindowMessage(true, false)
-            if msg == 0x101 then
-                mainSt[0] = false
-            end
-        end
-    end
-end
-
-function onScriptTerminate(script, quitGame)
-	if script == this then
-		inicfg.save(setts, directIni)
+	if msg == 0x100 or msg == 0x101 then
+		if (arg == 0x1B and mainSt[0]) and not isPauseMenuActive() then consumeWindowMessage(true, false)
+			if msg == 0x101 then mainSt[0] = false end
+		end
 	end
 end
 
-function lfunc.theme()
+function onScriptTerminate(script, quitGame) if script == this then inicfg.save(setts, directIni) end end
+
+function theme()
 	imgui.SwitchContext()
 	local style = imgui.GetStyle()
 	local colors = style.Colors
@@ -429,19 +334,16 @@ function lfunc.theme()
 
 	style.WindowPadding = mVec2(8, 8)
 	style.ItemSpacing = mVec2(5, 5)
-
 	style.WindowBorderSize = 0
 	style.PopupBorderSize = 0
 	style.FrameBorderSize = 0
 	style.ScrollbarSize = 9
-
 	style.WindowRounding = 7
 	style.ChildRounding = 7
 	style.FrameRounding = 4
 	style.PopupRounding = 7
 	style.GrabRounding = 7
 	style.TabRounding = 7
-
 	colors[clr.Text] = mVec4(1.00, 1.00, 1.00, 1.00)
 	colors[clr.TextDisabled] = mVec4(1.00, 1.00, 1.00, 0.40)
 	colors[clr.BorderShadow] = zeroClr
@@ -460,7 +362,7 @@ function lfunc.theme()
 end
 
 imgui.OnInitialize(function()
-    lfunc.theme()
+    theme()
 	
 	imgui.GetIO().IniFilename = nil
     local config = imgui.ImFontConfig()
@@ -472,7 +374,7 @@ imgui.OnInitialize(function()
 	f25 = imgui.GetIO().Fonts:AddFontFromFileTTF(getFolderPath(0x14) .. '//trebucbd.ttf', 25, _, imgui.GetIO().Fonts:GetGlyphRangesCyrillic())
 end)
 
-function lfunc.split(str, delim, plain)
+function split(str, delim, plain)
 	local tokens, pos, plain = {}, 1, not (plain == false)
 	repeat
 		local npos, epos = string.find(str, delim, pos, plain)
