@@ -1,7 +1,7 @@
 script_name('Pilot Helper')
 script_author('Revavi')
-script_version('1.1.2')
-script_version_number(7)
+script_version('1.1.3')
+script_version_number(8)
 
 local encoding = require 'encoding'
 local imgui = require 'mimgui'
@@ -263,13 +263,13 @@ function getTimer(time)
 end
 
 function sampev.onServerMessage(color, text)
-	text = text:gsub('%{......%}', '')
+	text = text:gsub('%{......%}', ''):gsub(',', ''):gsub('%.', '')
 	if not text:find('(.+)_(.+)%[(%d+)%]') then
 		if text:find('Присаживайтесь на стул напротив доски') then firstChar = true end
-		if text:find('Врач--окулист: Произносите%, как называется выделенная буква') then oculist = true
+		if text:find('Врач--окулист: Произносите как называется выделенная буква') then oculist = true
 			if showCharacters[0] then lua_thread.create(function() wait(50) msg('Первая буква: '..(nextChar:find('Неизвестно') and '{FF0000}' or '{00FF00}')..nextChar) end) end
 			firstChar = false end
-		if text:find('Врач--окулист: Хорошо%, со зрением у Вас всё впорядке%, проходите к') or text:find('Врач--окулист: Увы%, Вы не правильно назвали выделенную букву') then oculist=false nextChar='Неизвестно(Обратитесь к разработчику)' end
+		if text:find('Врач--окулист: Хорошо со зрением у Вас всё впорядке проходите к') or text:find('Врач--окулист: Увы Вы не правильно назвали выделенную букву') then oculist=false nextChar='Неизвестно(Обратитесь к разработчику)' end
 		if text:find('%[Подсказка%] Рейс успешно завершен! Заработано за рейс: $(%d+) за смену всего: $(%d+)') then
 			local money = text:match('Заработано за рейс: $(%d+)')
 			hour = tonumber(os.date('%H', os.time() + diff))
@@ -279,14 +279,14 @@ function sampev.onServerMessage(color, text)
 		if text:find('Благодаря улучшениям вашей семьи вы получаете дополнительную зарплату: $(%d+)') then
 			local money = text:match('дополнительную зарплату: $(%d+)')
 			proxyStats.main.money = stats.main.money + money end
-		if text:find('За работу в рабочее время вашей организации вы получаете прибавку к зарплате: $(%d+).') then
-			local money = text:match('прибавку к зарплате: $(%d+).')
+		if text:find('За работу в рабочее время вашей организации вы получаете прибавку к зарплате: $(%d+)') then
+			local money = text:match('прибавку к зарплате: $(%d+)')
 			proxyStats.main.money = stats.main.money + money end
 		if text:find('Получено вознаграждение: (.+)') then
 			local larec = text:match('Получено вознаграждение: (.+)')
-			if larec == 'Ларец Tidex.' then proxyStats.main.tidex = stats.main.tidex + 1 end
-			if larec == 'Ларец с премией.' then proxyStats.main.award = stats.main.award + 1 end
-			if larec == 'Ларец пилота.' then proxyStats.main.pilot = stats.main.pilot + 1 end
+			if larec == 'Ларец Tidex' then proxyStats.main.tidex = stats.main.tidex + 1 end
+			if larec == 'Ларец с премией' then proxyStats.main.award = stats.main.award + 1 end
+			if larec == 'Ларец пилота' then proxyStats.main.pilot = stats.main.pilot + 1 end
 		end
 	end
 end
